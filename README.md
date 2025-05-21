@@ -1,119 +1,96 @@
-# Logo-matching
-Logo Similarity Grouping – Veridion Challenge
-Task
+
+# Logo Similarity Grouping – Veridion Challenge
+
+## Task
+
 Group websites based on the similarity of their logos.
 
-Problem and Motivation
-Logos are a crucial part of a brand’s identity. This project aims to extract logos from thousands of websites and group them based on visual similarity, without using traditional ML clustering algorithms (e.g., KMeans, DBSCAN).
+## Problem and Motivation
 
-Initial Thought Process
-My initial idea was to group logos solely by average color, inspired by visual processing techniques learned during university courses. This seemed simple, fast, and scalable.
+Logos are a crucial part of a brand’s identity. This project aims to extract logos from thousands of websites and group them based on visual similarity, **without using traditional ML clustering algorithms** (e.g., KMeans, DBSCAN).
 
-However, after analyzing the dataset (~3400 domains), I realized that:
+## Initial Thought Process
 
-Many logos share dominant background colors.
+The initial idea was to group logos by **average color**, inspired by university coursework in visual processing. While simple and elegant, this method proved insufficient when applied to a dataset of ~3400 domains:
 
-The most distinctive feature of logos is often text (brand name, initials, etc.).
+- Many logos share dominant color tones.
+- Text in logos provides stronger brand distinction.
 
-So I decided to combine:
+I therefore combined:
+- **OCR** for extracting text from logos.
+- **Average color** as a fallback when no text is detected.
 
-OCR (Optical Character Recognition) to extract text,
+## Solution Architecture
 
-and average color as a fallback when no text was detected.
+### 1. Logo Extraction (`extract_logos.py`)
 
-Solution Architecture
-1. Logo Extraction (extract_logos.py)
-This was by far the most complex component.
+This was the most complex part of the project.
 
-Major challenges encountered:
+**Challenges:**
+- Highly inconsistent HTML structures.
+- Logos lacked specific tags, but parent elements often had identifiers like `logo` or `brand`.
+- Some sites didn't render images in headless mode.
+- Incorrect logo matches from cookie banners, social icons, payment badges.
+- HTTP-only domains, offline sites, and anti-scraping headers.
 
-Websites vary drastically in structure.
+**Approach:**
+- Used Selenium with a scoring system based on URL patterns, alt/class attributes, and DOM context.
+- Combined several methods: DOM search, CSS background-image detection, inline SVG, and network request analysis.
 
-Logos often don’t have obvious tags (logo, brand), but their parent elements do.
+### 2. SVG to PNG Conversion (`convertToPNG.py`)
 
-Some websites don’t load images in headless Selenium.
+Converted all SVG logos to PNG using `cairosvg`, with fallbacks for undefined SVG sizes.
 
-Logos were sometimes mistakenly extracted from cookie banners, payment badges (Visa, Mastercard), or social media.
+### 3. Normalization (`normalise.py`)
 
-Many domains were offline or only supported HTTP.
+- Resized all logos to 256x256 px.
+- Centered logos on a magenta background for uniformity.
 
-Some sites blocked requests unless proper HTTP headers were sent.
+### 4. Grouping by Text or Color (`compare.py`)
 
-Solution highlights:
+- Used `pytesseract` for OCR text extraction.
+- If no text was detected, fallback to grouping by average RGB color.
+- Group naming was based on extracted text or representative color.
 
-Selenium-based scraping with a scoring system to evaluate image relevance.
+### 5. HTML Visualization (`generateHTML.py`)
 
-Multiple complementary methods:
+Generated a clean HTML page to browse grouped logos with metadata on grouping basis (text or color).
 
-XPath DOM search,
+## Results
 
-CSS background-image extraction,
+- Over **97%** of websites had logos successfully extracted.
+- Grouping showed clear patterns based on text or color similarity.
+- Logos from the same brand were generally clustered well—if resolution and text visibility allowed.
 
-inline SVG handling,
+## Limitations and Observations
 
-analysis of network requests.
+- Some logos from the same website were treated as different due to low resolution or minor color variance.
+- Low-resolution images impaired both OCR and color detection accuracy.
+- Stylized or custom fonts caused OCR to fail.
+- Language-specific branding in logos (site localized versions) confused grouping logic.
+- Slight hue changes between logos of the same brand led to split groups.
+- Some false positives from headers or third-party images.
 
-2. SVG to PNG Conversion (convertToPNG.py)
-All SVGs were converted to PNG using cairosvg, including fallback for undefined SVG sizes.
+## Advanced Observations & Future Improvements
 
-3. Normalization (normalise.py)
-All logos were resized to 256×256 px.
+- Implement **multithreading** for large-scale scraping.
+- Add more robust similarity checks: perceptual hashing (phash), SSIM, or vision embeddings.
+- Improve parent-based heuristics to avoid header noise.
+- Use webpage language context to adjust OCR expectations.
+- Introduce adaptive RGB similarity thresholds.
+- Consider geometric vector comparison for SVGs.
 
-Each image was centered on a fixed background (magenta) for uniformity.
+## Example Groups
 
-4. Grouping by Text or Color (compare.py)
-Used pytesseract to extract text via OCR.
+```
+Group 001 (7 images) – based on: 'veridion'
+Group 003 (4 images) – based on: color_0_0_0
+Group 010 (1 image) – based on: '__empty__'
+```
 
-If OCR failed, fallback was to group by average RGB color.
+## Directory Structure
 
-Grouping was done based on identical text or similar color values.
-
-5. HTML Visualization (generateHTML.py)
-A static HTML page was generated to visualize logo groups.
-
-Each group was labeled by its similarity method (text or color-based).
-
-Results
-Successfully extracted logos for over 97% of the websites.
-
-Groupings were consistent and meaningful in most cases.
-
-Clear similarities emerged when logos shared textual or visual elements.
-
-Limitations and Observations
-Some incorrect extractions occurred (e.g., cookie banners, Visa logos).
-
-Low-resolution logos couldn’t be reliably processed via OCR or color analysis.
-
-Stylized or distorted fonts significantly reduced OCR accuracy.
-
-Some websites displayed language-specific logos (e.g., localized text), which caused the same brand to be split into separate groups.
-
-Logos from the same company with slight color tone variations were rarely grouped together due to strict RGB tolerance.
-
-Multiple logos from the same website were sometimes separated due to resolution or visual noise.
-
-Advanced Observations & Future Improvements
-Multithreading can drastically improve scraping speed.
-
-Introduce more robust similarity checks:
-
-perceptual hashing (e.g., phash),
-
-structural similarity (SSIM),
-
-visual embeddings from pretrained models.
-
-Enhance scraping logic to avoid false positives from headers or non-logo elements.
-
-Consider site language to adjust OCR or use language-specific models.
-
-Implement adaptive tolerance thresholds based on image resolution and format.
-
-Use geometric comparison of shapes (e.g., for SVGs) when OCR and color both fail.
-
-Directory structure:
-
+```
 ├── extract_logos.py
 ├── convertToPNG.py
 ├── normalise.py
@@ -126,9 +103,11 @@ Directory structure:
 │       ├── normalised/
 │       ├── grouped_by_text_or_color/
 │       └── groups.json
+```
 
-Run order:
+## How to Run
 
+```bash
 # Step 1: Extract logos from websites
 python extract_logos.py
 
@@ -143,8 +122,8 @@ python compare.py
 
 # Step 5: Generate a static website to visualize results
 python generateHTML.py
+```
 
-Conclusion
-This project demonstrated the real-world complexity of a seemingly simple task: extracting and grouping logos. Scraping real websites requires dynamic heuristics and lots of exception handling. Combining OCR and color analysis offered a practical and scalable approach to logo clustering without any ML.
+## Conclusion
 
-With further improvements, this solution can evolve into a scalable, accurate, and production-ready system capable of processing millions of logos.
+This project highlighted the real-world challenges of automating logo extraction and visual grouping. A mix of visual heuristics, OCR, and color analysis proved effective without ML. With further enhancements—scalability, smarter comparison techniques, and better extraction—this pipeline can scale to millions of records.
