@@ -100,7 +100,7 @@ os.makedirs("../data/logos/svgs", exist_ok=True)
 df = pd.read_parquet('../data/logos.snappy.parquet')
 img_src = ''
 stats = {
-    'logo': 0,
+    'logo': 3157,
     'website': 0,
     'offline': 0,
     'percentage': None
@@ -690,7 +690,17 @@ def find_logo_in_requests(driver, stats, response, domain):
     return False
 
 
-for domain in df['domain']:
+start_domain = 'aamcoredlandsca.com'
+
+# Verificăm dacă domeniul există în dataframe
+if start_domain in df['domain'].values:
+    start_index = df[df['domain'] == start_domain].index[0]
+    domains_to_check = df.loc[start_index:, 'domain']
+else:
+    print(f"Domeniul {start_domain} nu a fost găsit în dataframe.")
+    domains_to_check = []
+
+for domain in domains_to_check:
     found = False
     stats_build(0, 1, 0, stats)
     for protocol in ['https://', 'http://']:
@@ -699,13 +709,11 @@ for domain in df['domain']:
         try:
             driver.get(url)
             try:
-                # Add proper headers for the main page request
                 response = requests.get(url, headers=BROWSER_HEADERS, timeout=5)
             except Exception as e:
                 print(f"Eroare la cererea requests pentru {url}: {e}")
                 continue
 
-            # Rulăm metodele de căutare a logo-ului
             try:
                 if try_selenium_search_all_img_or_svg(driver, stats, response, domain):
                     found = True
@@ -730,5 +738,8 @@ for domain in df['domain']:
     if not found:
         stats_build(0, 0, 1, stats)
 
-# Close the driver when done
+    # Clear accumulated network requests to prevent memory leak
+    del driver.requests[:]
+
+# Închide browserul
 driver.quit()
